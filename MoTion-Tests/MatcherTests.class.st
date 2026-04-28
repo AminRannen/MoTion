@@ -17,6 +17,45 @@ MatcherTests >> testMatcherBoolean [
 ]
 
 { #category : 'tests' }
+MatcherTests >> testMatcherHigherOrEqualTo [
+    | myMatcher |
+    myMatcher := MatcherHigherOrEqualTo new.
+    myMatcher value: 100.
+    self assert: (myMatcher match: 100) isMatch.
+    self assert: (myMatcher match: 150) isMatch.
+    self deny: (myMatcher match: 50) isMatch.
+
+]
+
+{ #category : 'tests' }
+MatcherTests >> testMatcherHigherThan [
+    | myMatcher |
+    myMatcher := MatcherHigherThan new.
+    myMatcher value: 100.
+    self assert: (myMatcher match: 150) isMatch.
+    self deny: (myMatcher match: 50) isMatch.
+]
+
+{ #category : 'tests' }
+MatcherTests >> testMatcherLessThan [
+    | myMatcher |
+    myMatcher := MatcherLessThan new.
+    myMatcher value: 100.
+    self assert: (myMatcher match: 50) isMatch.
+    self deny: (myMatcher match: 150) isMatch.
+]
+
+{ #category : 'tests' }
+MatcherTests >> testMatcherLessThanOrEqualTo [
+    | myMatcher |
+    myMatcher := MatcherLessThanOrEqualTo new.
+    myMatcher value: 100.
+    self assert: (myMatcher match: 100) isMatch.
+    self assert: (myMatcher match: 50) isMatch.
+    self deny: (myMatcher match: 150) isMatch.
+]
+
+{ #category : 'tests' }
 MatcherTests >> testMatcherNil [
 	
 	| matcher |
