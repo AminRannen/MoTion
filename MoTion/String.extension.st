@@ -18,18 +18,26 @@ String >> asMooseObjectPath [
 
 { #category : '*MoTion' }
 String >> asObjectPath [
-
-	| symbol |
-	symbol := self asSymbol.
-	(symbol includes: $>) ifTrue: [ 
-		^ MTComposedPath of:
-			  ((symbol splitOn: '>') collect: [ :each | each asObjectPath ]) ].
-	symbol = #_ ifTrue: [ ^ MTDirectChildrenPath new ].
-	symbol = #'_*' ifTrue: [ ^ MTRecursiveChildrenPath new ].
-	(symbol endsWith: '*') ifTrue: [ ^ MTRecursivePath of: (symbol withoutSuffix: '*' ) ] .
-	symbol = #@ ifTrue: [ ^MTIdentityPath new ].
-	
-	^ MTDirectPath of: symbol
+    | symbol |
+    symbol := self asSymbol.
+    (symbol includes: $>) ifTrue: [ 
+        ^ MTComposedPath of:
+              ((symbol splitOn: '>') collect: [ :each | each asObjectPath ]) ].
+    symbol = #_ ifTrue: [ ^ MTDirectChildrenPath new ].
+    symbol = #'_*' ifTrue: [ ^ MTRecursiveChildrenPath new ].
+    
+    "AJOUTER ICI POUR LIMITED :"
+    (symbol includesSubstring: '*') ifTrue: [
+        | parts |
+        parts := symbol substrings: $*.
+        ^ MTRecursiveLimitedPath 
+            of: parts first 
+            depth: parts last asInteger
+    ].
+    
+    (symbol endsWith: '*') ifTrue: [ ^ MTRecursivePath of: (symbol withoutSuffix: '*') ].
+    symbol = #@ ifTrue: [ ^ MTIdentityPath new ].
+    ^ MTDirectPath of: symbol
 ]
 
 { #category : '*MoTion' }
