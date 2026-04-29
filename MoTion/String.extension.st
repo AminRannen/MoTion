@@ -27,13 +27,13 @@ String >> asObjectPath [
     symbol = #'_*' ifTrue: [ ^ MTRecursiveChildrenPath new ].
     
     "AJOUTER ICI POUR LIMITED :"
-    (symbol includesSubstring: '*') ifTrue: [
-        | parts |
-        parts := symbol substrings: $*.
-        ^ MTRecursiveLimitedPath 
-            of: parts first 
-            depth: parts last asInteger
-    ].
+(symbol includesSubstring: '*') ifTrue: [
+    | parts |
+    parts := symbol splitOn: $*.
+    ^ MTRecursiveLimitedPath 
+        of: parts first 
+        depth: parts last asInteger
+].
     
     (symbol endsWith: '*') ifTrue: [ ^ MTRecursivePath of: (symbol withoutSuffix: '*') ].
     symbol = #@ ifTrue: [ ^ MTIdentityPath new ].

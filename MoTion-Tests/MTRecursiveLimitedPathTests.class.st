@@ -69,6 +69,40 @@ self assertCollection: result hasSameElements: { c.  a. b }.
 ]
 
 { #category : 'tests' }
+MTRecursiveLimitedPathTests >> testRecursiveLimitedPathWithFASTAST [
+    | res pattern results |
+    res := FASTTypeScriptParser new parse: 'class MyClass {
+        method1(a, b) { return a + b; }
+        method2(x) { return x * 2; }
+        method3() { let y = 5; return y; }
+    }'.
+    
+    pattern := FASTTypeScriptClassDeclaration % {
+        #'children*2' <=> (FASTTypeScriptMethodDefinition % {} as: #method)
+    }.
+    
+    results := pattern collectBindings: {#method} for: (res allWithType: FASTTypeScriptClassDeclaration) first.
+    
+    self assert: results size equals: 3.
+]
+
+{ #category : 'tests' }
+MTRecursiveLimitedPathTests >> testRecursiveLimitedPathWithFamix [
+    | model class method path result |
+    model := MooseModel root allModels second.
+    class := (model allWithType: FamixTypeScriptClass) first.
+    method := (class methods select: [:m | m name = 'calculate']) first.
+
+    "depth 1 → seulement les paramètres de calculate"
+    path := MTRecursiveLimitedPath of: #parameters depth: 1.
+    result := path resolveFrom: method.
+    
+    self assert: result size equals: 2.
+    self assert: (result anySatisfy: [:p | p name = 'logError']).
+    self assert: (result anySatisfy: [:p | p name = 'toggle']).
+]
+
+{ #category : 'tests' }
 MTRecursiveLimitedPathTests >> testRecursivePath2 [
 | d e f g h path result |
 d := MTTestObjectD new.
