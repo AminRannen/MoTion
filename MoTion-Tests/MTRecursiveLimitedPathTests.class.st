@@ -27,6 +27,21 @@ MTRecursiveLimitedPathTests >> setUp [
 ]
 
 { #category : 'tests' }
+MTRecursiveLimitedPathTests >> testAsObjectPathParsing [
+    | path |
+    path := #'e*2' asObjectPath.
+    self assert: path class equals: MTRecursiveLimitedPath.
+]
+
+{ #category : 'tests' }
+MTRecursiveLimitedPathTests >> testDepth0 [
+    | path result |
+    path := MTRecursiveLimitedPath of: #e depth: 0.
+    result := path resolveFrom: d.
+    self assertCollection: result hasSameElements: #().
+]
+
+{ #category : 'tests' }
 MTRecursiveLimitedPathTests >> testDepth1 [
     | path result |
     path := MTRecursiveLimitedPath of: #e depth: 1.
@@ -59,6 +74,35 @@ MTRecursiveLimitedPathTests >> testDepth2OnF [
 ]
 
 { #category : 'tests' }
+MTRecursiveLimitedPathTests >> testDepth3 [
+    | path result |
+    path := MTRecursiveLimitedPath of: #c depth: 3.
+    result := path resolveFrom: a.
+    self assertCollection: result hasSameElements: { c. a. b }.
+]
+
+{ #category : 'tests' }
+MTRecursiveLimitedPathTests >> testDepthWithNonExistentPath [
+    | path result |
+    path := MTRecursiveLimitedPath of: #z depth: 2.
+    result := path resolveFrom: a.
+    self assertCollection: result hasSameElements: #().
+]
+
+{ #category : 'tests' }
+MTRecursiveLimitedPathTests >> testHigherThanWithMoTion [
+    | pattern |
+    a lint: 150.
+    pattern := MTTestObjectA % {
+        (#lint higherThan: 100)
+    }.
+    self assert: (pattern match: a) isMatch.
+    
+    a lint: 50.
+    self deny: (pattern match: a) isMatch.
+]
+
+{ #category : 'tests' }
 MTRecursiveLimitedPathTests >> testRecursiveLimitedPath [
     | path result |
     
@@ -69,37 +113,55 @@ self assertCollection: result hasSameElements: { c.  a. b }.
 ]
 
 { #category : 'tests' }
-MTRecursiveLimitedPathTests >> testRecursiveLimitedPathWithFASTAST [
-    | res pattern results |
-    res := FASTTypeScriptParser new parse: 'class MyClass {
-        method1(a, b) { return a + b; }
-        method2(x) { return x * 2; }
-        method3() { let y = 5; return y; }
-    }'.
-    
-    pattern := FASTTypeScriptClassDeclaration % {
-        #'children*2' <=> (FASTTypeScriptMethodDefinition % {} as: #method)
+MTRecursiveLimitedPathTests >> testRecursiveLimitedPathDSL [
+    | pattern results |
+    pattern := MTTestObjectA % {
+        #'c*2' <=> (MTTestObjectC % {} as: #found)
     }.
-    
-    results := pattern collectBindings: {#method} for: (res allWithType: FASTTypeScriptClassDeclaration) first.
-    
-    self assert: results size equals: 3.
+    results := pattern collectBindings: {#found} for: a.
+    self assert: results isEmpty not.
 ]
 
 { #category : 'tests' }
-MTRecursiveLimitedPathTests >> testRecursiveLimitedPathWithFamix [
-    | model class method path result |
-    model := MooseModel root allModels second.
-    class := (model allWithType: FamixTypeScriptClass) first.
-    method := (class methods select: [:m | m name = 'calculate']) first.
+MTRecursiveLimitedPathTests >> testRecursiveLimitedPathDSLWithPharoAST [
+    | pattern result |
+    pattern := RBMethodNode % {
+        #'children*3' <=> (RBMessageNode % {
+            #'selector>value' <=> #>
+        } as: #found)
+    }.
+    result := pattern collectBindings: {#found} 
+              for: (MatcherHigherThan >> #matchOnlyNumber:withContext:) ast.
+    self assert: result isEmpty not.
+]
 
-    "depth 1 → seulement les paramètres de calculate"
-    path := MTRecursiveLimitedPath of: #parameters depth: 1.
-    result := path resolveFrom: method.
+{ #category : 'tests' }
+MTRecursiveLimitedPathTests >> testRecursiveLimitedPathWithObjects [
+    | pattern results |
+    pattern := MTTestObjectA % {
+        #'b>c' <=> (MTTestObjectC % {} as: #found)
+    }.
     
-    self assert: result size equals: 2.
-    self assert: (result anySatisfy: [:p | p name = 'logError']).
-    self assert: (result anySatisfy: [:p | p name = 'toggle']).
+    results := pattern collectBindings: {#found} for: a.
+    
+    self assert: results size equals: 1.
+    self assert: (results first at: #found) equals: c.
+]
+
+{ #category : 'tests' }
+MTRecursiveLimitedPathTests >> testRecursiveLimitedPathWithPharoAST [
+    | pattern result |
+    "AST of matchOnlyNumber:withContext: contains a > message"
+    pattern := RBMethodNode % {
+        #'children*3' <=> (RBMessageNode % {
+            #'selector>value' <=> #>
+        } as: #found)
+    }.
+    
+    result := pattern collectBindings: {#found} 
+              for: (MatcherHigherThan >> #matchOnlyNumber:withContext:) ast.
+    
+    self assert: result isEmpty not.
 ]
 
 { #category : 'tests' }

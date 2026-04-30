@@ -3,7 +3,8 @@ Class {
 	#superclass : 'Object',
 	#instVars : [
 		'e',
-		'f'
+		'f',
+		'lint'
 	],
 	#category : 'MoTion-Tests',
 	#package : 'MoTion-Tests'
@@ -18,4 +19,9 @@ MTTestObjectD >> e: anE [
 { #category : 'accessing' }
 MTTestObjectD >> f: anF [
     f := anF
+]
+
+{ #category : 'accessing' }
+MTTestObjectD >> lint: anInteger [
+    lint := anInteger
 ]
