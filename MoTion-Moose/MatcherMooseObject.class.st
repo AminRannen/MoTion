@@ -28,3 +28,8 @@ MatcherMooseObject >> isMooseMatcher [
 MatcherMooseObject >> properties [
     ^ properties
 ]
+
+{ #category : 'accessing' }
+MatcherMooseObject >> type [
+    ^ type
+]
