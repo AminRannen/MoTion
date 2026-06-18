@@ -2,73 +2,168 @@ Class {
 	#name : 'MoTionRule',
 	#superclass : 'Object',
 	#instVars : [
-		'sourcePattern',
-		'targetPattern',
+		'binding',
 		'model',
-		'source'
+		'newValue',
+		'source',
+		'sourcePattern',
+		'bindings'
 	],
 	#category : 'Model-Transformation',
 	#package : 'Model-Transformation'
 }
 
 { #category : 'accessing' }
-MoTionRule >> model [
-    ^ model
+MoTionRule >> binding [
+
+	^ binding
 ]
 
 { #category : 'accessing' }
-MoTionRule >> model: aModel [
-    model := aModel
+MoTionRule >> binding: anObject [
+
+	binding := anObject
+]
+
+{ #category : 'accessing' }
+MoTionRule >> bindings [
+
+	^ bindings
+]
+
+{ #category : 'accessing' }
+MoTionRule >> bindings: anObject [
+
+	bindings := anObject
+]
+
+{ #category : 'executing' }
+MoTionRule >> execute [
+    | matches sortedMatches newSource newModel |
+    matches := self sourcePattern
+        collectBindings: { self binding asSymbol }
+        for: self model.
+    
+    "Trie par startPos DÉCROISSANT — du dernier au premier:"
+    sortedMatches := matches asSortedCollection: [ :a :b |
+        (a at: self binding asSymbol) startPos > 
+        (b at: self binding asSymbol) startPos
+    ].
+    
+    newSource := source.
+    
+    sortedMatches do: [ :binding |
+        | node |
+        node := binding at: self binding asSymbol.
+        newSource := newSource
+            copyReplaceFrom: node startPos
+            to: node endPos
+            with: newValue.
+    ].
+    
+    newModel := FASTTypeScriptParser new parse: newSource.
+    ^ Association key: newSource value: newModel
+]
+
+{ #category : 'as yet unclassified' }
+MoTionRule >> executeOnFirst [
+    | matches node newSource newModel |
+    matches := self sourcePattern
+        collectBindings: { self binding asSymbol }
+        for: self model.
+    
+    "Prend seulement le PREMIER match"
+    node := matches first at: self binding asSymbol.
+    
+    newSource := source
+        copyReplaceFrom: node startPos
+        to: node endPos
+        with: newValue.
+    
+    newModel := FASTTypeScriptParser new parse: newSource.
+    ^ Association key: newSource value: newModel
+]
+
+{ #category : 'as yet unclassified' }
+MoTionRule >> executeWithBindings [
+
+	| matches sortedChanges newSource  |
+	matches := self sourcePattern
+		           collectBindings: bindings keys asArray
+		           for: self model.
+
+	"Collecte tous les noeuds avec leurs nouvelles valeurs:"
+	sortedChanges := OrderedCollection new.
+	matches do: [ :match |
+		bindings keysAndValuesDo: [ :bindingKey :newVal |
+			| node |
+			node := match at: bindingKey ifAbsent: [ nil ].
+			node isNil ifFalse: [
+				sortedChanges add: (Association key: node value: newVal) ] ] ].
+
+	"Trie par startPos décroissant:"
+	sortedChanges := sortedChanges asSortedCollection: [ :a :b |
+		                 a key startPos > b key startPos ].
+
+	newSource := source.
+
+	"Applique chaque changement:"
+	sortedChanges do: [ :assoc |
+		| node newVal |
+		node := assoc key.
+		newVal := assoc value.
+		newSource := newSource
+			             copyReplaceFrom: node startPos
+			             to: node endPos
+			             with: newVal ].
+
+	^ newSource
+]
+
+{ #category : 'accessing' }
+MoTionRule >> model [
+
+	^ model
+]
+
+{ #category : 'accessing' }
+MoTionRule >> model: anObject [
+
+	model := anObject
+]
+
+{ #category : 'accessing' }
+MoTionRule >> newValue [
+
+	^ newValue
+]
+
+{ #category : 'accessing' }
+MoTionRule >> newValue: anObject [
+
+	newValue := anObject
 ]
 
 { #category : 'accessing' }
 MoTionRule >> source [
-    ^ source.
+
+	^ source
 ]
 
 { #category : 'accessing' }
-MoTionRule >> source: aString [
-    source := aString.
+MoTionRule >> source: anObject [
+
+	source := anObject
 ]
 
 { #category : 'accessing' }
 MoTionRule >> sourcePattern [
-    ^ sourcePattern
+
+	^ sourcePattern
 ]
 
 { #category : 'accessing' }
-MoTionRule >> sourcePattern: aPattern [
-    sourcePattern := aPattern
-]
+MoTionRule >> sourcePattern: anObject [
 
-{ #category : 'accessing' }
-MoTionRule >> targetPattern [
-    ^ targetPattern
-]
-
-{ #category : 'accessing' }
-MoTionRule >> targetPattern: aPattern [
-    targetPattern := aPattern
-]
-
-{ #category : 'transforming' }
-MoTionRule >> transform [
-    | diff results node rootType alias |
-    rootType := sourcePattern type.
-    alias := sourcePattern properties first value alias.
-    diff := MoTionDiff new.
-    diff sourcePattern: sourcePattern.
-    diff targetPattern: targetPattern.
-    diff compute.
-    results := sourcePattern
-        collectBindings: { alias }
-        for: (model allWithType: rootType) first.
-    results do: [ :binding |
-        node := binding at: alias.
-        diff differences do: [ :change |
-            source := source
-                copyReplaceFrom: node startPos
-                to: node endPos
-                with: change to value ] ].
-    ^ source
+	sourcePattern := anObject
 ]
