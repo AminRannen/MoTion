@@ -97,6 +97,72 @@ TestTSTransformationWithMoTion >> testRenameClass [
 ]
 
 { #category : 'tests' }
+TestTSTransformationWithMoTion >> testRenameClassAndMethod [
+
+	| pattern rule newSource newModel class |
+	"creating a pattern with one binding "
+	pattern := FASTTypeScriptClassDeclaration % {
+		           (#name <=> FASTTypeScriptTypeIdentifier
+		            % { (#sourceCode <=> 'Calculator') } as: #className).
+		           (#'children*' <=> FASTTypeScriptMethodDefinition
+		            % { (#name <=> FASTTypeScriptPropertyIdentifier
+			             % { (#sourceCode <=> 'multiply') } as: #methodName) }) }.
+
+	"matching pattern with a selected method"
+	class := (model allWithType: FASTTypeScriptClassDeclaration) first.
+	"create moTionRule "
+	rule := MoTionRule new.
+	rule sourcePattern: pattern.
+	rule model: class.
+	rule source: sourceCode.
+	"Precise the binding and the new Name of the class "
+	rule bindings: { (#methodName -> 'multiplication').
+	                 (#className -> 'Calculator666') } asDictionary.
+	"execute the Rule and get the new Source"
+	newSource := rule executeWithBindings.
+	"Parse the new Source Code and verify the new class named modified"
+	newModel := parser parse: newSource.
+	self assert:
+		((newModel allWithType: FASTTypeScriptMethodDefinition) anySatisfy: [
+			 :m | m name sourceCode = 'multiplication' ]).
+			self assert:
+		((newModel allWithType: FASTTypeScriptClassDeclaration) anySatisfy: [
+			 :m | m name sourceCode = 'Calculator666' ]).
+]
+
+{ #category : 'tests' }
+TestTSTransformationWithMoTion >> testRenameClassWildCard [
+
+	| pattern result rule newSource newModel |
+	"creating a pattern with one binding "
+	pattern := FASTTypeScriptClassDeclaration
+	           % { #name <=> FASTTypeScriptTypeIdentifier
+		            % { (#sourceCode <=> #'@className') }  }.
+
+	"matching pattern with a selected class"
+	result := pattern match:
+		          (model allWithType: FASTTypeScriptClassDeclaration) first.
+	self assert: result isMatch.
+
+	"create moTionRule "
+	rule := MoTionRule new.
+	rule sourcePattern: pattern.
+	rule model: (model allWithType: FASTTypeScriptClassDeclaration) first.
+	rule source: sourceCode.
+	"Precise the binding and the new Name of the class "
+	rule bindings: { (#className -> 'Calculator222') } asDictionary.
+	"execute the Rule and get the new Source"
+	newSource := rule executeWithBindings.
+	"Parse the new Source Code and verify the new class named modified"
+	newModel := parser parse: newSource.
+	self
+		assert:
+			(newModel allWithType: FASTTypeScriptClassDeclaration) first name
+				sourceCode
+		equals: 'Calculator222'
+]
+
+{ #category : 'tests' }
 TestTSTransformationWithMoTion >> testRenameMethod [
 
 	| pattern  rule newSource newModel method |
