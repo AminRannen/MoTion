@@ -9,8 +9,8 @@ Class {
 		'sourcePattern',
 		'bindings'
 	],
-	#category : 'Model-Transformation',
-	#package : 'Model-Transformation'
+	#category : 'MoTion-FAST-Transformation',
+	#package : 'MoTion-FAST-Transformation'
 }
 
 { #category : 'accessing' }

@@ -6,8 +6,8 @@ Class {
 		'model',
 		'sourceCode'
 	],
-	#category : 'Model-Transformation-Tests',
-	#package : 'Model-Transformation-Tests'
+	#category : 'MoTion-FAST-Transformation-Tests',
+	#package : 'MoTion-FAST-Transformation-Tests'
 }
 
 { #category : 'running' }
