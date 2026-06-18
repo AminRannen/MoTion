@@ -37,34 +37,6 @@ MoTionRule >> bindings: anObject [
 	bindings := anObject
 ]
 
-{ #category : 'executing' }
-MoTionRule >> execute [
-    | matches sortedMatches newSource newModel |
-    matches := self sourcePattern
-        collectBindings: { self binding asSymbol }
-        for: self model.
-    
-    "Trie par startPos DÉCROISSANT — du dernier au premier:"
-    sortedMatches := matches asSortedCollection: [ :a :b |
-        (a at: self binding asSymbol) startPos > 
-        (b at: self binding asSymbol) startPos
-    ].
-    
-    newSource := source.
-    
-    sortedMatches do: [ :binding |
-        | node |
-        node := binding at: self binding asSymbol.
-        newSource := newSource
-            copyReplaceFrom: node startPos
-            to: node endPos
-            with: newValue.
-    ].
-    
-    newModel := FASTTypeScriptParser new parse: newSource.
-    ^ Association key: newSource value: newModel
-]
-
 { #category : 'as yet unclassified' }
 MoTionRule >> executeOnFirst [
     | matches node newSource newModel |
