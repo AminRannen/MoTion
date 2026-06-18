@@ -6,7 +6,8 @@ Class {
 		'model',
 		'newValue',
 		'source',
-		'sourcePattern'
+		'sourcePattern',
+		'bindings'
 	],
 	#category : 'Model-Transformation',
 	#package : 'Model-Transformation'
@@ -22,6 +23,18 @@ MoTionRuleNew >> binding [
 MoTionRuleNew >> binding: anObject [
 
 	binding := anObject
+]
+
+{ #category : 'accessing' }
+MoTionRuleNew >> bindings [
+
+	^ bindings
+]
+
+{ #category : 'accessing' }
+MoTionRuleNew >> bindings: anObject [
+
+	bindings := anObject
 ]
 
 { #category : 'executing' }
@@ -50,6 +63,62 @@ MoTionRuleNew >> execute [
     
     newModel := FASTTypeScriptParser new parse: newSource.
     ^ Association key: newSource value: newModel
+]
+
+{ #category : 'as yet unclassified' }
+MoTionRuleNew >> executeOnFirst [
+    | matches node newSource newModel |
+    matches := self sourcePattern
+        collectBindings: { self binding asSymbol }
+        for: self model.
+    
+    "Prend seulement le PREMIER match"
+    node := matches first at: self binding asSymbol.
+    
+    newSource := source
+        copyReplaceFrom: node startPos
+        to: node endPos
+        with: newValue.
+    
+    newModel := FASTTypeScriptParser new parse: newSource.
+    ^ Association key: newSource value: newModel
+]
+
+{ #category : 'as yet unclassified' }
+MoTionRuleNew >> executeWithBindings [
+    | matches sortedChanges newSource newModel |
+    
+    matches := self sourcePattern
+        collectBindings: bindings keys asArray
+        for: self model.
+    
+    "Collecte tous les noeuds avec leurs nouvelles valeurs:"
+    sortedChanges := OrderedCollection new.
+    matches do: [ :match |
+        bindings keysAndValuesDo: [ :bindingKey :newVal |
+            | node |
+            node := match at: bindingKey ifAbsent: [ nil ].
+            node isNil ifFalse: [
+                sortedChanges add: (Association key: node value: newVal) ] ] ].
+    
+    "Trie par startPos décroissant:"
+    sortedChanges := sortedChanges asSortedCollection: [ :a :b |
+        a key startPos > b key startPos ].
+    
+    newSource := source.
+    
+    "Applique chaque changement:"
+    sortedChanges do: [ :assoc |
+        | node newVal |
+        node := assoc key.
+        newVal := assoc value.
+        newSource := newSource
+            copyReplaceFrom: node startPos
+            to: node endPos
+            with: newVal ].
+    
+    newModel := FASTTypeScriptParser new parse: newSource.
+    ^ Association key: newSource value: newModel.
 ]
 
 { #category : 'accessing' }
