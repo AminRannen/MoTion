@@ -58,38 +58,72 @@ MoTionRule >> executeOnFirst [
 
 { #category : 'as yet unclassified' }
 MoTionRule >> executeWithBindings [
+    | matches sortedChanges newSource |
+    matches := self sourcePattern
+                   collectBindings: bindings keys asArray
+                   for: self model.
+    sortedChanges := OrderedCollection new.
+    matches do: [ :match |
+        bindings keysAndValuesDo: [ :bindingKey :newVal |
+            | nodeOrValue node |
+            nodeOrValue := match at: bindingKey ifAbsent: [ nil ].
+            nodeOrValue isNil ifFalse: [
+                node := (nodeOrValue respondsTo: #startPos)
+                    ifTrue: [ nodeOrValue ]
+                    ifFalse: [
+                        self findNodeWithSourceCode: nodeOrValue inModel: self model
+                    ].
+                node isNil ifFalse: [
+                    sortedChanges add: (Association key: node value: newVal) ] ] ] ].
+    sortedChanges := sortedChanges asSortedCollection: [ :a :b |
+                         a key startPos > b key startPos ].
+    newSource := source.
+    sortedChanges do: [ :assoc |
+        | node newVal |
+        node := assoc key.
+        newVal := assoc value.
+        newSource := newSource
+                         copyReplaceFrom: node startPos
+                         to: node endPos
+                         with: newVal ].
+    ^ newSource
+]
 
-	| matches sortedChanges newSource  |
-	matches := self sourcePattern
-		           collectBindings: bindings keys asArray
-		           for: self model.
+{ #category : 'as yet unclassified' }
+MoTionRule >> findAssociation: association in: myPattern [
 
-	"Collecte tous les noeuds avec leurs nouvelles valeurs:"
-	sortedChanges := OrderedCollection new.
-	matches do: [ :match |
-		bindings keysAndValuesDo: [ :bindingKey :newVal |
-			| node |
-			node := match at: bindingKey ifAbsent: [ nil ].
-			node isNil ifFalse: [
-				sortedChanges add: (Association key: node value: newVal) ] ] ].
+	myPattern properties do: [ :assoc |
+		assoc = association
+			ifTrue: [ ^ myPattern ]
+			ifFalse: [^ self findAssociation: association in: assoc value ] ]
+]
 
-	"Trie par startPos décroissant:"
-	sortedChanges := sortedChanges asSortedCollection: [ :a :b |
-		                 a key startPos > b key startPos ].
+{ #category : 'as yet unclassified' }
+MoTionRule >> findNodeWithSourceCode: aString inModel: aModel [
 
-	newSource := source.
 
-	"Applique chaque changement:"
-	sortedChanges do: [ :assoc |
-		| node newVal |
-		node := assoc key.
-		newVal := assoc value.
-		newSource := newSource
-			             copyReplaceFrom: node startPos
-			             to: node endPos
-			             with: newVal ].
+	^ aModel allChildren
+		  detect: [ :node |
+			  (node respondsTo: #sourceCode) and: [ node sourceCode = aString ] ]
+		  ifNone: [ nil ]
+]
 
-	^ newSource
+{ #category : 'as yet unclassified' }
+MoTionRule >> findWildcard: aWildcardKey in: anObjectOfTypeA [
+	"Recursively searches through associations for the value matching aWildcardKey.
+     Returns the value found, or nil if not found."
+
+	anObjectOfTypeA properties do: [ :assoc |
+		(assoc value isKindOf: MatcherWildcard) ifTrue: [
+			assoc value alias = aWildcardKey ifTrue: [ ^ assoc  ] ].
+
+		"If the value is itself of type A, recurse into it"
+		(assoc value isKindOf: MatcherMooseObject) ifTrue: [
+			| result |
+			result := self findWildcard: aWildcardKey in: assoc value.
+			result ifNotNil: [ ^ result ] ] ].
+
+	^ nil
 ]
 
 { #category : 'accessing' }

@@ -18,7 +18,7 @@ TestTSTransformationWithMoTion >> setUp [
   // ===== Variables =====
   private memory: number;
   private history: number[];
-
+  myVar: number = 42;
   constructor() {
     this.memory = 0;
     this.history = [];
@@ -60,25 +60,24 @@ TestTSTransformationWithMoTion >> setUp [
   }
   }'.
 	parser := FASTTypeScriptParser new.
-	model := 	parser parse: sourceCode
+	model := parser parse: sourceCode
 ]
 
 { #category : 'tests' }
 TestTSTransformationWithMoTion >> testRenameClass [
 
 	| pattern result rule newSource newModel |
-	
 	"creating a pattern with one binding "
 	pattern := FASTTypeScriptClassDeclaration
 	           % { (#name <=> FASTTypeScriptTypeIdentifier
 		            % { (#sourceCode <=> 'Calculator') } as: #className) }.
-		
+
 	"matching pattern with a selected class"
 	result := pattern match:
 		          (model allWithType: FASTTypeScriptClassDeclaration) first.
 	self assert: result isMatch.
 
-"create moTionRule "
+	"create moTionRule "
 	rule := MoTionRule new.
 	rule sourcePattern: pattern.
 	rule model: (model allWithType: FASTTypeScriptClassDeclaration) first.
@@ -86,6 +85,7 @@ TestTSTransformationWithMoTion >> testRenameClass [
 	"Precise the binding and the new Name of the class "
 	rule bindings: { (#className -> 'Calculator222') } asDictionary.
 	"execute the Rule and get the new Source"
+
 	newSource := rule executeWithBindings.
 	"Parse the new Source Code and verify the new class named modified"
 	newModel := parser parse: newSource.
@@ -136,8 +136,8 @@ TestTSTransformationWithMoTion >> testRenameClassWildCard [
 	| pattern result rule newSource newModel |
 	"creating a pattern with one binding "
 	pattern := FASTTypeScriptClassDeclaration
-	           % { #name <=> FASTTypeScriptTypeIdentifier
-		            % { (#sourceCode <=> #'@className') }  }.
+	           % { (#name <=> FASTTypeScriptTypeIdentifier
+		            % { (#sourceCode <=> #'@className') }) }.
 
 	"matching pattern with a selected class"
 	result := pattern match:
@@ -147,7 +147,7 @@ TestTSTransformationWithMoTion >> testRenameClassWildCard [
 	"create moTionRule "
 	rule := MoTionRule new.
 	rule sourcePattern: pattern.
-	rule model: (model allWithType: FASTTypeScriptClassDeclaration) first.
+   rule model: (model allWithType: FASTTypeScriptClassDeclaration) first.
 	rule source: sourceCode.
 	"Precise the binding and the new Name of the class "
 	rule bindings: { (#className -> 'Calculator222') } asDictionary.
