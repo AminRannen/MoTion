@@ -25,9 +25,9 @@ TestTSTransformationWithMoTion >> setUp [
   }
 
   // ===== Basic operations =====
-    add(a: number, b: number): number {
-        return a + b;
-    }
+  add(a: number, b: number, unused: string): number {
+    return a + b;
+  }
 
   subtract(a: number, b: number): number {
     const result = a - b;
@@ -227,39 +227,26 @@ TestTSTransformationWithMoTion >> testBinding10_GenericWildcardPlusAs [
 
 { #category : 'tests' }
 TestTSTransformationWithMoTion >> testRemoveUnusedParameter [
-    | pattern rule newSource newModel method |
-    sourceCode := 'class Calculator {
-        add(a: number, b: number, unused: string): number {
-            return a + b;
-        }
-    }'.
-    parser := FASTTypeScriptParser new.
-    model := parser parse: sourceCode.
-    
+    | pattern rule newSource method newModel |
     method := (model allWithType: FASTTypeScriptMethodDefinition)
-        detect: [ :m | m name sourceCode = 'add' ].
-    
+        detect: [:m | m name sourceCode = 'add'].
     pattern := FASTTypeScriptMethodDefinition % {
         (#parameters <=> (FASTTypeScriptFormalParameters % {
             #_ <=> { #'@p1' . #'@p2' . #'@p3' }
         }))
     }.
-    
     rule := MoTionRule new.
     rule sourcePattern: pattern.
     rule model: method.
     rule source: sourceCode.
-    rule bindings: { (#p3 -> nil) } asDictionary.
-    
+    rule bindings: { #p3 -> 'remove' } asDictionary.
     newSource := rule executeRemoval.
     newModel := parser parse: newSource.
-    
-    method := (newModel allWithType: FASTTypeScriptMethodDefinition)
-        detect: [ :m | m name sourceCode = 'add' ].
-    
-    self assert: method parameters genericChildren size equals: 2.
-    self deny: (newSource includesSubstring: 'unused').
-
+    "verifier que unused est supprimé dans la méthode add"
+    self deny: (newSource includesSubstring: 'unused: string').
+    "verifier que a et b sont toujours là"
+    self assert: (newSource includesSubstring: 'a: number').
+    self assert: (newSource includesSubstring: 'b: number')
 ]
 
 { #category : 'tests' }

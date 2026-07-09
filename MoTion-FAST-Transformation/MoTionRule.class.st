@@ -68,7 +68,7 @@ MoTionRule >> executeRemoval [
             | node |
             node := match at: bindingKey ifAbsent: [ nil ].
             node isNil ifFalse: [ sortedNodes add: node ] ] ].
-    "Trie par startPos décroissant pour suppression sans décalage"
+    "Trie par startPos décroissant"
     sortedNodes := sortedNodes asSortedCollection: [ :a :b |
                        a startPos > b startPos ].
     newSource := source.
@@ -76,11 +76,14 @@ MoTionRule >> executeRemoval [
         | from to |
         from := node startPos.
         to := node endPos.
-        "Gère la virgule trailing si elle existe juste après"
-        (newSource at: to + 1 ifAbsent: [ nil ]) = $,
-            ifTrue: [ to := to + 1.
-                      (newSource at: to + 1 ifAbsent: [ nil ]) = $ 
-                          ifTrue: [ to := to + 1 ] ].
+        "Gère la virgule + espace AVANT le noeud"
+        ((newSource at: from - 1 ifAbsent: [ nil ]) = $ 
+            and: [ (newSource at: from - 2 ifAbsent: [ nil ]) = $, ])
+            ifTrue: [ from := from - 2 ]
+            ifFalse: [
+                "Ou la virgule + espace APRÈS le noeud (si c'est le premier)"
+                (newSource at: to + 1 ifAbsent: [ nil ]) = $,
+                    ifTrue: [ to := to + 2 ] ].
         newSource := newSource
                          copyReplaceFrom: from
                          to: to
@@ -90,40 +93,54 @@ MoTionRule >> executeRemoval [
 
 { #category : 'as yet unclassified' }
 MoTionRule >> executeWithBindings [
-
-	| matches sortedChanges newSource |
-	matches := self sourcePattern
-		           collectBindings: bindings keys asArray
-		           for: self model.
-	sortedChanges := OrderedCollection new.
-	matches do: [ :match |
-		bindings keysAndValuesDo: [ :bindingKey :newVal |
-			| nodeOrValue node |
-			
-			nodeOrValue := match at: bindingKey ifAbsent: [ nil ].
-			nodeOrValue isNil ifFalse: [
-				node := (nodeOrValue respondsTo: #startPos)
-					        ifTrue: [ nodeOrValue ]
-					        ifFalse: [
-					        self
-						        findNodeWithSourceCode: nodeOrValue
-						        inModel: self model ].
-(node notNil and: [
-    sortedChanges noneSatisfy: [:a | a key startPos = node startPos]
-]) ifTrue: [
-    sortedChanges add: (Association key: node value: newVal) ] ] ] ].
-	sortedChanges := sortedChanges asSortedCollection: [ :a :b |
-		                 a key startPos > b key startPos ].
-	newSource := source.
-	sortedChanges do: [ :assoc |
-		| node newVal |
-		node := assoc key.
-		newVal := assoc value.
-		newSource := newSource
-			             copyReplaceFrom: node startPos
-			             to: node endPos
-			             with: newVal ].
-	^ newSource
+    | matches sortedChanges newSource |
+    matches := self sourcePattern
+                   collectBindings: bindings keys asArray
+                   for: self model.
+    sortedChanges := OrderedCollection new.
+    matches do: [ :match |
+        bindings keysAndValuesDo: [ :bindingKey :newVal |
+            | nodeOrValue |
+            nodeOrValue := match at: bindingKey ifAbsent: [ nil ].
+            nodeOrValue isNil ifFalse: [
+                (nodeOrValue respondsTo: #startPos)
+                    ifTrue: [
+                        "cas 1 : nœud AST direct (as:)"
+                        (sortedChanges noneSatisfy: [:a | a key startPos = nodeOrValue startPos])
+                            ifTrue: [ sortedChanges add: (Association key: nodeOrValue value: newVal) ] ]
+                    ifFalse: [
+                        (nodeOrValue isKindOf: Collection)
+                            ifTrue: [
+                                "cas 2 : collection (*rest)"
+                                nodeOrValue do: [:each |
+                                    | eachNode |
+                                    eachNode := (each respondsTo: #startPos)
+                                        ifTrue: [ each ]
+                                        ifFalse: [ self findNodeWithSourceCode: each inModel: self model ].
+                                    (eachNode notNil and: [
+                                       "Deduplication pour èviter les memes matchs comme CalculatorNew " sortedChanges noneSatisfy: [:a | a key startPos = eachNode startPos]
+                                    ]) ifTrue: [
+                                        sortedChanges add: (Association key: eachNode value: newVal) ] ] ]
+                            ifFalse: [
+                                "cas 3 : String (@x)"
+                                | node |
+                                node := self findNodeWithSourceCode: nodeOrValue inModel: self model.
+                                (node notNil and: [
+                                    sortedChanges noneSatisfy: [:a | a key startPos = node startPos]
+                                ]) ifTrue: [
+                                    sortedChanges add: (Association key: node value: newVal) ] ] ] ] ] ].
+    sortedChanges := sortedChanges asSortedCollection: [ :a :b |
+                         a key startPos > b key startPos ].
+    newSource := source.
+    sortedChanges do: [ :assoc |
+        | node newVal |
+        node := assoc key.
+        newVal := assoc value.
+        newSource := newSource
+                         copyReplaceFrom: node startPos
+                         to: node endPos
+                         with: newVal ].
+    ^ newSource
 ]
 
 { #category : 'as yet unclassified' }
