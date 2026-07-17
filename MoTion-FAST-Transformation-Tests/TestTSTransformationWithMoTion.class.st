@@ -67,6 +67,38 @@ TestTSTransformationWithMoTion >> setUp [
 ]
 
 { #category : 'tests' }
+TestTSTransformationWithMoTion >> testBinding03_ExecuteWithBindings [
+    | pattern rule newSource newModel method |
+    method := (model allWithType: FASTTypeScriptMethodDefinition)
+        detect: [:m | m name sourceCode = 'power'].
+    pattern := FASTTypeScriptMethodDefinition % {
+        (#parameters <=> (FASTTypeScriptFormalParameters % {
+            (#_ <=> { #'@p1' . #'@p2' })
+        }))
+    }.
+    rule := MoTionRule new.
+    rule sourcePattern: pattern.
+    rule model: method.
+    rule source: sourceCode.
+    rule bindings: {
+        (#p1 -> 'x: number').
+        (#p2 -> 'y: number')
+    } asDictionary.
+    newSource := rule executeWithBindings.
+    newModel := parser parse: newSource.
+    method := (newModel allWithType: FASTTypeScriptMethodDefinition)
+        detect: [:m | m name sourceCode = 'power'].
+    self assert: (method parameters children
+        anySatisfy: [:p | p sourceCode = 'x: number']).
+    self assert: (method parameters children
+        anySatisfy: [:p | p sourceCode = 'y: number']).
+    self deny: (method parameters children
+        anySatisfy: [:p | p sourceCode = 'base: number']).
+    self deny: (method parameters children
+        anySatisfy: [:p | p sourceCode = 'exponent: number'])
+]
+
+{ #category : 'tests' }
 TestTSTransformationWithMoTion >> testBinding03_ListAllParams [
     | pattern matches method |
     method := (model allWithType: FASTTypeScriptMethodDefinition)
@@ -132,6 +164,38 @@ TestTSTransformationWithMoTion >> testBinding04_ListWithWildcard [
 ]
 
 { #category : 'tests' }
+TestTSTransformationWithMoTion >> testBinding05_ExecuteWithBindingsMultiple [
+    "Renomme 2 params de compute via liste fixe"
+    | pattern rule newSource newModel method |
+    method := (model allWithType: FASTTypeScriptMethodDefinition)
+        detect: [ :m | m name sourceCode = 'compute' ].
+    pattern := FASTTypeScriptMethodDefinition % {
+        (#parameters <=> (FASTTypeScriptFormalParameters % {
+            #_ <=> { #'@p1' . #'@p2' . #'@p3' . #'@p4' }
+        }))
+    }.
+    rule := MoTionRule new.
+    rule sourcePattern: pattern.
+    rule model: method.
+    rule source: sourceCode.
+    rule bindings: {
+        (#p1 -> 'a: number').
+        (#p2 -> 'b: number').
+        (#p3 -> 'c: number').
+        (#p4 -> 'd: number') } asDictionary.
+    newSource := rule executeWithBindings.
+    newModel := parser parse: newSource.
+    method := (newModel allWithType: FASTTypeScriptMethodDefinition)
+        detect: [ :m | m name sourceCode = 'compute' ].
+    self assert: (method parameters genericChildren
+        anySatisfy: [ :p | p sourceCode = 'a: number' ]).
+    self assert: (method parameters genericChildren
+        anySatisfy: [ :p | p sourceCode = 'b: number' ]).
+    self deny: (method parameters genericChildren
+        anySatisfy: [ :p | p sourceCode = 'x: number' ])
+]
+
+{ #category : 'tests' }
 TestTSTransformationWithMoTion >> testBinding05_GenericWildcard [
     | pattern matches method |
     method := (model allWithType: FASTTypeScriptMethodDefinition)
@@ -145,6 +209,39 @@ TestTSTransformationWithMoTion >> testBinding05_GenericWildcard [
 ]
 
 { #category : 'tests' }
+TestTSTransformationWithMoTion >> testBinding06_ExecuteWithBindingsClassAndMethod [
+	"Renomme classe + méthode compute en même temps"
+
+	| pattern rule newSource newModel |
+	pattern := FASTTypeScriptClassDeclaration % {
+		           (#name
+		            <=>
+			            (FASTTypeScriptTypeIdentifier
+			             % { (#sourceCode <=> 'Calculator') } as: #className)).
+		           (#'children*'
+		            <=> (FASTTypeScriptMethodDefinition % { (#name
+			              <=>
+				              (FASTTypeScriptPropertyIdentifier
+				               % { (#sourceCode <=> 'compute') } as: #methodName)) })) }.
+	rule := MoTionRule new.
+	rule sourcePattern: pattern.
+	rule model: (model allWithType: FASTTypeScriptClassDeclaration) first.
+	rule source: sourceCode.
+	rule bindings: {
+			(#className -> 'AdvancedCalculator').
+			(#methodName -> 'calculate') } asDictionary.
+	newSource := rule executeWithBindings.
+	newModel := parser parse: newSource.
+	self assert:
+		((newModel allWithType: FASTTypeScriptClassDeclaration) anySatisfy: [
+			 :c | c name sourceCode = 'AdvancedCalculator' ]).
+	self assert:
+		((newModel allWithType: FASTTypeScriptMethodDefinition) anySatisfy: [
+			 :m | m name sourceCode = 'calculate' ]).
+		
+]
+
+{ #category : 'tests' }
 TestTSTransformationWithMoTion >> testBinding06_OrderIgnored [
 
 	| pattern matches method |
@@ -152,7 +249,7 @@ TestTSTransformationWithMoTion >> testBinding06_OrderIgnored [
 		          detect: [ :m | m name sourceCode = 'add' ].
 	pattern := FASTTypeScriptMethodDefinition
 	           % { (#parameters <=> (FASTTypeScriptFormalParameters
-		             % { (#_ <=> { #'@p1'. #'@p2' } orderIgnored) })) }.
+		             % { (#_ <=> { #'@p1'. #'@p2'. #'@p3' } orderIgnored) })) }.
 	matches := pattern collectBindings: #( #p1 #p2 ) for: method.
 	self assert: matches isEmpty not.
 	self assert: (matches first at: #p1) sourceCode equals: 'a: number'.
@@ -175,6 +272,47 @@ TestTSTransformationWithMoTion >> testBinding07_AsPlusAtSign [
 	self assert: ((matches first at: #methodNode) respondsTo: #startPos).
 	
 	
+]
+
+{ #category : 'tests' }
+TestTSTransformationWithMoTion >> testBinding07_ExecuteWithBindingsClassMethodAndParams [
+    "Renomme classe + méthode + 2 params en une seule règle"
+    | pattern rule newSource newModel renamedMethod |
+    pattern := FASTTypeScriptClassDeclaration % {
+        (#name <=> (FASTTypeScriptTypeIdentifier % {
+            (#sourceCode <=> 'Calculator')
+        } as: #className)).
+        (#'children*' <=> (FASTTypeScriptMethodDefinition % {
+            (#name <=> (FASTTypeScriptPropertyIdentifier % {
+                (#sourceCode <=> 'compute')
+            } as: #methodName)).
+            (#parameters <=> (FASTTypeScriptFormalParameters % {
+                #_ <=> { #'@p1' . #'@p2' . #'@p3' . #'@p4' }
+            }))
+        }))
+    }.
+    rule := MoTionRule new.
+    rule sourcePattern: pattern.
+    rule model: (model allWithType: FASTTypeScriptClassDeclaration) first.
+    rule source: sourceCode.
+    rule bindings: {
+        (#className -> 'SuperCalculator').
+        (#methodName -> 'superCompute').
+        (#p1 -> 'a: number').
+        (#p2 -> 'b: number').
+        (#p3 -> 'c: number').
+        (#p4 -> 'd: number') } asDictionary.
+    newSource := rule executeWithBindings.
+    newModel := parser parse: newSource.
+    self assert: ((newModel allWithType: FASTTypeScriptClassDeclaration)
+        anySatisfy: [ :c | c name sourceCode = 'SuperCalculator' ]).
+    renamedMethod := (newModel allWithType: FASTTypeScriptMethodDefinition)
+        detect: [ :m | m name sourceCode = 'superCompute' ] ifNone: [ nil ].
+    self assert: renamedMethod isNotNil.
+    self assert: (renamedMethod parameters genericChildren
+        anySatisfy: [ :p | p sourceCode = 'a: number' ]).
+    self assert: (renamedMethod parameters genericChildren
+        anySatisfy: [ :p | p sourceCode = 'd: number' ])
 ]
 
 { #category : 'tests' }
@@ -213,16 +351,60 @@ TestTSTransformationWithMoTion >> testBinding09_ListFixedPlusContainerAs [
 
 { #category : 'tests' }
 TestTSTransformationWithMoTion >> testBinding10_GenericWildcardPlusAs [
-    | pattern matches method |
-    method := (model allWithType: FASTTypeScriptMethodDefinition)
-        detect: [ :m | m name sourceCode = 'add' ].
-    pattern := FASTTypeScriptMethodDefinition % {
-        (#_ <=> (FASTTypeScriptFormalParameters % {
-            #_ <=> { #'@p1' . #'@p2' }
-        } as: #paramsNode))
+
+	| pattern matches method |
+	method := (model allWithType: FASTTypeScriptMethodDefinition)
+		          detect: [ :m | m name sourceCode = 'add' ].
+	pattern := FASTTypeScriptMethodDefinition % { (#_
+	            <=>
+		            (FASTTypeScriptFormalParameters
+		             % { (#_ <=> { #'@p1'. #'@p2'. #'@p3' }) } as: #paramsNode)) }.
+	matches := pattern
+		           collectBindings: #( #p1 #p2 #paramsNode )
+		           for: method.
+	self assert: matches isEmpty not
+]
+
+{ #category : 'tests' }
+TestTSTransformationWithMoTion >> testRemoveClass [
+    | pattern rule newSource newModel |
+    pattern := FASTTypeScriptClassDeclaration % {
+        (#name <=> (FASTTypeScriptTypeIdentifier % {
+            (#sourceCode <=> 'Calculator')
+        }))
+    } as: #classToDelete.
+    rule := MoTionRule new.
+    rule sourcePattern: pattern.
+    rule model: (model allWithType: FASTTypeScriptClassDeclaration) first.
+    rule source: sourceCode.
+    rule bindings: { #classToDelete -> 'remove' } asDictionary.
+    newSource := rule executeRemoval.
+    self deny: (newSource includesSubstring: 'class Calculator').
+    self deny: (newSource includesSubstring: 'multiply').
+    self deny: (newSource includesSubstring: 'add')
+]
+
+{ #category : 'tests' }
+TestTSTransformationWithMoTion >> testRemoveMethod [
+    | pattern rule newSource newModel |
+    pattern := FASTTypeScriptClassDeclaration % {
+        (#'children*' <=> (FASTTypeScriptMethodDefinition % {
+            (#name <=> (FASTTypeScriptPropertyIdentifier % {
+                (#sourceCode <=> 'multiply')
+            }))
+        } as: #methodToDelete))
     }.
-    matches := pattern collectBindings: #(#p1 #p2 #paramsNode) for: method.
-    self assert: matches isEmpty not
+    rule := MoTionRule new.
+    rule sourcePattern: pattern.
+    rule model: (model allWithType: FASTTypeScriptClassDeclaration) first.
+    rule source: sourceCode.
+    rule bindings: { #methodToDelete -> 'remove' } asDictionary.
+    newSource := rule executeRemoval.
+    newModel := parser parse: newSource.
+    self deny: ((newModel allWithType: FASTTypeScriptMethodDefinition)
+        anySatisfy: [ :m | m name sourceCode = 'multiply' ]).
+    self assert: ((newModel allWithType: FASTTypeScriptMethodDefinition)
+        anySatisfy: [ :m | m name sourceCode = 'add' ])
 ]
 
 { #category : 'tests' }
@@ -318,38 +500,33 @@ TestTSTransformationWithMoTion >> testRenameClassAndMethod [
 
 { #category : 'tests' }
 TestTSTransformationWithMoTion >> testRenameClassAndMethodWildcard [
-
-	| pattern rule newSource newModel class |
-	"creating a pattern with one binding "
-	pattern := FASTTypeScriptClassDeclaration % {
-		           (#name <=> FASTTypeScriptTypeIdentifier
-		            % { (#sourceCode <=> #'@className') }).
-		           (#'children*' <=> FASTTypeScriptMethodDefinition
-		            % { (#name <=> FASTTypeScriptPropertyIdentifier
-			             % { (#sourceCode <=> #'@methodName') }) }) }.
-
-	"matching pattern with a selected method"
-	class := (model allWithType: FASTTypeScriptClassDeclaration) first.
-	"create moTionRule "
-	rule := MoTionRule new.
-	rule sourcePattern: pattern.
-	rule model: class.
-	rule source: sourceCode.
-	"Precise the binding and the new Name of the class "
-	rule bindings: {
-			(#methodName -> 'multiplication').
-			(#className -> 'CalculatorNew') } asDictionary.
-	"execute the Rule and get the new Source"
-	newSource := rule executeWithBindings.
-	"Parse the new Source Code and verify the new class named modified"
-	newModel := parser parse: newSource.
-	self assert:
-		((newModel allWithType: FASTTypeScriptMethodDefinition) anySatisfy: [
-			 :m | m name sourceCode = 'multiplication' ]).
-	self assert:
-		((newModel allWithType: FASTTypeScriptClassDeclaration) anySatisfy: [
-			 :m | m name sourceCode = 'CalculatorNew' ]).
-	
+    | pattern rule newSource newModel class |
+    pattern := FASTTypeScriptClassDeclaration % {
+        (#name <=> (FASTTypeScriptTypeIdentifier % {
+            (#sourceCode <=> 'Calculator')
+        } as: #className)).
+        (#'children*' <=> (FASTTypeScriptMethodDefinition % {
+            (#name <=> (FASTTypeScriptPropertyIdentifier % {
+                (#sourceCode <=> 'multiply')
+            } as: #methodName))
+        }))
+    }.
+    class := (model allWithType: FASTTypeScriptClassDeclaration) first.
+    rule := MoTionRule new.
+    rule sourcePattern: pattern.
+    rule model: class.
+    rule source: sourceCode.
+    rule bindings: {
+        (#methodName -> 'multiplication').
+        (#className -> 'CalculatorNew') } asDictionary.
+    newSource := rule executeWithBindings.
+    newModel := parser parse: newSource.
+    self assert:
+        ((newModel allWithType: FASTTypeScriptMethodDefinition) anySatisfy: [
+            :m | m name sourceCode = 'multiplication' ]).
+    self assert:
+        ((newModel allWithType: FASTTypeScriptClassDeclaration) anySatisfy: [
+            :m | m name sourceCode = 'CalculatorNew' ])
 ]
 
 { #category : 'tests' }
