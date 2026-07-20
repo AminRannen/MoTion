@@ -68,34 +68,33 @@ TestTSTransformationWithMoTion >> setUp [
 
 { #category : 'tests' }
 TestTSTransformationWithMoTion >> testBinding03_ExecuteWithBindings [
-    | pattern rule newSource newModel method |
-    method := (model allWithType: FASTTypeScriptMethodDefinition)
-        detect: [:m | m name sourceCode = 'power'].
-    pattern := FASTTypeScriptMethodDefinition % {
-        (#parameters <=> (FASTTypeScriptFormalParameters % {
-            (#_ <=> { #'@p1' . #'@p2' })
-        }))
-    }.
-    rule := MoTionRule new.
-    rule sourcePattern: pattern.
-    rule model: method.
-    rule source: sourceCode.
-    rule bindings: {
-        (#p1 -> 'x: number').
-        (#p2 -> 'y: number')
-    } asDictionary.
-    newSource := rule executeWithBindings.
-    newModel := parser parse: newSource.
-    method := (newModel allWithType: FASTTypeScriptMethodDefinition)
-        detect: [:m | m name sourceCode = 'power'].
-    self assert: (method parameters children
-        anySatisfy: [:p | p sourceCode = 'x: number']).
-    self assert: (method parameters children
-        anySatisfy: [:p | p sourceCode = 'y: number']).
-    self deny: (method parameters children
-        anySatisfy: [:p | p sourceCode = 'base: number']).
-    self deny: (method parameters children
-        anySatisfy: [:p | p sourceCode = 'exponent: number'])
+
+	| pattern rule newSource newModel method |
+	method := (model allWithType: FASTTypeScriptMethodDefinition)
+		          detect: [ :m | m name sourceCode = 'power' ].
+	pattern := FASTTypeScriptMethodDefinition % { #parameters
+	            <=>
+	            (FASTTypeScriptFormalParameters
+	             % { (#_ <=> { #'@p1'. #'@p2' }) })}.
+	rule := MoTionRule new.
+	rule sourcePattern: pattern.
+	rule model: method.
+	rule source: sourceCode.
+	rule bindings: {
+			(#p1 -> 'x: number').
+			(#p2 -> 'y: number') } asDictionary.
+	newSource := rule executeWithBindings.
+	newModel := parser parse: newSource.
+	method := (newModel allWithType: FASTTypeScriptMethodDefinition)
+		          detect: [ :m | m name sourceCode = 'power' ].
+	self assert: (method parameters children anySatisfy: [ :p |
+			 p sourceCode = 'x: number' ]).
+	self assert: (method parameters children anySatisfy: [ :p |
+			 p sourceCode = 'y: number' ]).
+	self deny: (method parameters children anySatisfy: [ :p |
+			 p sourceCode = 'base: number' ]).
+	self deny: (method parameters children anySatisfy: [ :p |
+			 p sourceCode = 'exponent: number' ])
 ]
 
 { #category : 'tests' }
@@ -367,7 +366,7 @@ TestTSTransformationWithMoTion >> testBinding10_GenericWildcardPlusAs [
 
 { #category : 'tests' }
 TestTSTransformationWithMoTion >> testRemoveClass [
-    | pattern rule newSource newModel |
+    | pattern rule newSource |
     pattern := FASTTypeScriptClassDeclaration % {
         (#name <=> (FASTTypeScriptTypeIdentifier % {
             (#sourceCode <=> 'Calculator')
@@ -377,7 +376,7 @@ TestTSTransformationWithMoTion >> testRemoveClass [
     rule sourcePattern: pattern.
     rule model: (model allWithType: FASTTypeScriptClassDeclaration) first.
     rule source: sourceCode.
-    rule bindings: { #classToDelete -> 'remove' } asDictionary.
+    rule removalBindings: #(#classToDelete).
     newSource := rule executeRemoval.
     self deny: (newSource includesSubstring: 'class Calculator').
     self deny: (newSource includesSubstring: 'multiply').
@@ -398,7 +397,7 @@ TestTSTransformationWithMoTion >> testRemoveMethod [
     rule sourcePattern: pattern.
     rule model: (model allWithType: FASTTypeScriptClassDeclaration) first.
     rule source: sourceCode.
-    rule bindings: { #methodToDelete -> 'remove' } asDictionary.
+    rule removalBindings: #(#methodToDelete).
     newSource := rule executeRemoval.
     newModel := parser parse: newSource.
     self deny: ((newModel allWithType: FASTTypeScriptMethodDefinition)
@@ -411,7 +410,7 @@ TestTSTransformationWithMoTion >> testRemoveMethod [
 TestTSTransformationWithMoTion >> testRemoveUnusedParameter [
     | pattern rule newSource method newModel |
     method := (model allWithType: FASTTypeScriptMethodDefinition)
-        detect: [:m | m name sourceCode = 'add'].
+        detect: [ :m | m name sourceCode = 'add' ].
     pattern := FASTTypeScriptMethodDefinition % {
         (#parameters <=> (FASTTypeScriptFormalParameters % {
             #_ <=> { #'@p1' . #'@p2' . #'@p3' }
@@ -421,14 +420,35 @@ TestTSTransformationWithMoTion >> testRemoveUnusedParameter [
     rule sourcePattern: pattern.
     rule model: method.
     rule source: sourceCode.
-    rule bindings: { #p3 -> 'remove' } asDictionary.
+    rule removalBindings: #(#p3).
     newSource := rule executeRemoval.
     newModel := parser parse: newSource.
-    "verifier que unused est supprimé dans la méthode add"
     self deny: (newSource includesSubstring: 'unused: string').
-    "verifier que a et b sont toujours là"
     self assert: (newSource includesSubstring: 'a: number').
     self assert: (newSource includesSubstring: 'b: number')
+]
+
+{ #category : 'tests' }
+TestTSTransformationWithMoTion >> testRemoveWithAtAndRest [
+    "Supprime tous les paramètres capturés via *rest"
+    | pattern rule newSource method newModel |
+    method := (model allWithType: FASTTypeScriptMethodDefinition)
+        detect: [ :m | m name sourceCode = 'add' ].
+    pattern := FASTTypeScriptMethodDefinition % {
+        (#parameters <=> (FASTTypeScriptFormalParameters % {
+            #_ <=> { #'@p1' . #'*rest' }
+        }))
+    }.
+    rule := MoTionRule new.
+    rule sourcePattern: pattern.
+    rule model: method.
+    rule source: sourceCode.
+    rule removalBindings: #(#rest).
+    newSource := rule executeRemoval.
+    newModel := parser parse: newSource.
+    "Vérifie que p1 reste et que rest est supprimé"
+    self assert: newModel isNotNil.
+    self deny: (newSource includesSubstring: 'unused: string')
 ]
 
 { #category : 'tests' }
@@ -617,6 +637,58 @@ TestTSTransformationWithMoTion >> testRenameParametersWithAt [
         anySatisfy: [:p | p sourceCode = 'x: number']).
     self assert: (addMethod parameters children 
         anySatisfy: [:p | p sourceCode = 'y: number'])
+]
+
+{ #category : 'tests' }
+TestTSTransformationWithMoTion >> testReplaceRestWithNewParams [
+    | pattern rule newSource method newModel |
+    method := (model allWithType: FASTTypeScriptMethodDefinition)
+        detect: [:m | m name sourceCode = 'add'].
+    pattern := FASTTypeScriptMethodDefinition % {
+        (#parameters <=> (FASTTypeScriptFormalParameters % {
+            (#_ <=> { #'@p1' . #'*rest' })
+        }))
+    }.
+    rule := MoTionRule new.
+    rule sourcePattern: pattern.
+    rule model: method.
+    rule source: sourceCode.
+    rule bindings: {
+        (#rest -> 'c: string')
+    } asDictionary.
+    newSource := rule executeWithBindings.
+    newModel := parser parse: newSource.
+    method := (newModel allWithType: FASTTypeScriptMethodDefinition)
+        detect: [:m | m name sourceCode = 'add'].
+    self assert: (method parameters children
+        anySatisfy: [:p | p sourceCode = 'c: string']).
+    self deny: (method parameters children
+        anySatisfy: [:p | p sourceCode = 'unused: string'])
+]
+
+{ #category : 'tests' }
+TestTSTransformationWithMoTion >> testReplaceRestWithNewParamsExecute [
+
+	| pattern rule newSource method newModel |
+	method := (model allWithType: FASTTypeScriptMethodDefinition)
+		          detect: [ :m | m name sourceCode = 'add' ].
+	pattern := FASTTypeScriptMethodDefinition % { (#parameters
+	            <=>
+	            (FASTTypeScriptFormalParameters
+	             % { (#_ <=> { #'@p1'. #'*rest' }) })) }.
+	rule := MoTionRule new.
+	rule sourcePattern: pattern.
+	rule model: method.
+	rule source: sourceCode.
+	rule bindings: { (#rest -> 'c: string') } asDictionary.
+	newSource := rule executeWithBindings.
+	newModel := parser parse: newSource.
+	method := (newModel allWithType: FASTTypeScriptMethodDefinition)
+		          detect: [ :m | m name sourceCode = 'add' ].
+	self assert: (method parameters children anySatisfy: [ :p |
+			 p sourceCode = 'c: string' ]).
+	self deny: (method parameters children anySatisfy: [ :p |
+			 p sourceCode = 'unused: string' ])
 ]
 
 { #category : 'tests' }

@@ -7,7 +7,8 @@ Class {
 		'newValue',
 		'source',
 		'sourcePattern',
-		'bindings'
+		'bindings',
+		'removalBindings'
 	],
 	#category : 'MoTion-FAST-Transformation',
 	#package : 'MoTion-FAST-Transformation'
@@ -60,15 +61,43 @@ MoTionRule >> executeOnFirst [
 MoTionRule >> executeRemoval [
     | matches sortedNodes newSource |
     matches := self sourcePattern
-                   collectBindings: bindings keys asArray
+                   collectBindings: removalBindings
                    for: self model.
     sortedNodes := OrderedCollection new.
     matches do: [ :match |
-        bindings keys do: [ :bindingKey |
-            | node |
-            node := match at: bindingKey ifAbsent: [ nil ].
-            node isNil ifFalse: [ sortedNodes add: node ] ] ].
-    "Trie par startPos décroissant"
+        removalBindings do: [ :bindingKey |
+            | nodeOrValue |
+            nodeOrValue := match at: bindingKey ifAbsent: [ nil ].
+            nodeOrValue isNil ifFalse: [
+                (nodeOrValue respondsTo: #startPos)
+                    ifTrue: [ "cas 1 : noeud AST direct (as:)"
+                        (sortedNodes noneSatisfy: [ :a |
+                            a startPos = nodeOrValue startPos ])
+                                ifTrue: [ sortedNodes add: nodeOrValue ] ]
+                    ifFalse: [
+                        (nodeOrValue isKindOf: Collection)
+                            ifTrue: [ "cas 2 : collection (*rest)"
+                                nodeOrValue do: [ :each |
+                                    | eachNode |
+                                    eachNode := (each respondsTo: #startPos)
+                                        ifTrue: [ each ]
+                                        ifFalse: [
+                                            self
+                                                findNodeWithSourceCode: each
+                                                inModel: self model ].
+                                    (eachNode notNil and: [
+                                        sortedNodes noneSatisfy: [ :a |
+                                            a startPos = eachNode startPos ] ])
+                                                ifTrue: [ sortedNodes add: eachNode ] ] ]
+                            ifFalse: [ "cas 3 : String (@x)"
+                                | node |
+                                node := self
+                                    findNodeWithSourceCode: nodeOrValue
+                                    inModel: self model.
+                                (node notNil and: [
+                                    sortedNodes noneSatisfy: [ :a |
+                                        a startPos = node startPos ] ])
+                                            ifTrue: [ sortedNodes add: node ] ] ] ] ] ].
     sortedNodes := sortedNodes asSortedCollection: [ :a :b |
                        a startPos > b startPos ].
     newSource := source.
@@ -76,12 +105,12 @@ MoTionRule >> executeRemoval [
         | from to |
         from := node startPos.
         to := node endPos.
-        "Gère la virgule + espace AVANT le noeud"
-        ((newSource at: from - 1 ifAbsent: [ nil ]) = $ 
-            and: [ (newSource at: from - 2 ifAbsent: [ nil ]) = $, ])
+        "Gère virgule avant"
+        ((newSource at: from - 1 ifAbsent: [ nil ]) = $  and: [
+             (newSource at: from - 2 ifAbsent: [ nil ]) = $, ])
             ifTrue: [ from := from - 2 ]
             ifFalse: [
-                "Ou la virgule + espace APRÈS le noeud (si c'est le premier)"
+                "Gère virgule après"
                 (newSource at: to + 1 ifAbsent: [ nil ]) = $,
                     ifTrue: [ to := to + 2 ] ].
         newSource := newSource
@@ -238,6 +267,16 @@ MoTionRule >> newValue [
 MoTionRule >> newValue: anObject [
 
 	newValue := anObject
+]
+
+{ #category : 'accessing' }
+MoTionRule >> removalBindings [
+    ^ removalBindings
+]
+
+{ #category : 'accessing' }
+MoTionRule >> removalBindings: aCollection [
+    removalBindings := aCollection
 ]
 
 { #category : 'accessing' }
