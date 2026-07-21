@@ -121,42 +121,6 @@ MoTionRule >> executeRemoval [
 ]
 
 { #category : 'as yet unclassified' }
-MoTionRule >> executeRemoveNode [
-
-	| matches sortedNodes newSource |
-	matches := self sourcePattern
-		           collectBindings: bindings keys asArray
-		           for: self model.
-	sortedNodes := OrderedCollection new.
-	matches do: [ :match |
-		bindings keys do: [ :bindingKey |
-			| node |
-			node := match at: bindingKey ifAbsent: [ nil ].
-			node isNil ifFalse: [ sortedNodes add: node ] ] ].
-	sortedNodes := sortedNodes asSortedCollection: [ :a :b |
-		               a startPos > b startPos ].
-	newSource := source.
-	sortedNodes do: [ :node |
-		| from to |
-		from := node startPos.
-		to := node endPos.
-		"Supprime aussi les espaces/tabs avant"
-		[
-		from > 1 and: [
-			(newSource at: from - 1) = $  or: [
-				(newSource at: from - 1) = Character tab ] ] ] whileTrue: [
-			from := from - 1 ].
-		"Supprime aussi le saut de ligne avant"
-		(from > 1 and: [ (newSource at: from - 1) = Character lf ]) ifTrue: [
-			from := from - 1 ].
-		"Supprime aussi le saut de ligne après"
-		(to < newSource size and: [ (newSource at: to + 1) = Character lf ])
-			ifTrue: [ to := to + 1 ].
-		newSource := newSource copyReplaceFrom: from to: to with: '' ].
-	^ newSource
-]
-
-{ #category : 'as yet unclassified' }
 MoTionRule >> executeWithBindings [
     | matches sortedChanges newSource |
     matches := self sourcePattern
